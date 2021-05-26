@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import openpyxl
 
 N = 5 # NUMBER OF FIGURES
 P = 5 # NUMBER OF MAX PANNELS PER FIGURE
@@ -173,3 +174,8 @@ def plot_fits(ax, x, y, yerr, xlabel, ylabel, title = None, xerr = None, x_ticks
     
     if title: ax.set_title(title)
     return r2_log/r2_linear
+
+def add_comment(filename, sheet, cell, comment):
+    wb2 = openpyxl.load_workbook(filename)
+    wb2[sheet][cell] = comment
+    wb2.save(filename)
