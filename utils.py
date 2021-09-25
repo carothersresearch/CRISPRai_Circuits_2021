@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import openpyxl
+from scipy.stats import ttest_ind, ttest_ind_from_stats
 
 N = 5 # NUMBER OF FIGURES
 P = 5 # NUMBER OF MAX PANNELS PER FIGURE
@@ -134,9 +135,9 @@ def scatter_plot(ax, df, x, y, yerr, ylabel, xlabel = None):
 def bar_plot(ax, df, x, xonly, y, yerr, ylabel, position = 0.5, width = barwidth, color = color, yerrshift = 0):
     df = df.drop_duplicates(x)
     df = df.set_index('Reaction ID').drop([r for r in df['Reaction ID'] if r not in xonly]).reindex(index=xonly).reset_index()
-    df.plot.bar(x = x, y =y, ax = ax, color = color,legend=False, position = position, width = width)
+    df.plot.bar(x = x, y = y, ax = ax, color = color,legend=False, position = position, width = width)
     ax.errorbar(np.arange(len(df))+yerrshift, df[y], yerr = df[yerr], alpha = alpha, capsize = capsize, fmt = 'none', ecolor = color, elinewidth = elinewidth )
-    
+        
     ax.set_ylabel(ylabel)
     ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(5))
     ax.xaxis.labelpad = xpad
@@ -145,15 +146,20 @@ def bar_plot(ax, df, x, xonly, y, yerr, ylabel, position = 0.5, width = barwidth
 def plot_fits(ax, x, y, yerr, xlabel, ylabel, title = None, xerr = None, x_ticks = [0,20,40,60], legend_size = 22):
     ax.errorbar(x, y, yerr, xerr, fmt='ko')
     
-    sol = np.polyfit(np.log(x), y, 1, full=True)
+    sol1 = np.polyfit(np.log(x), y, 1, full=True)
     xnew = np.linspace(x.iloc[0],x.iloc[-1])
-    fit_log =  np.polyval(sol[0], np.log(xnew))
-    r2_log = [1-sol[1]/((y - y.mean())**2).sum()][0][0]
+    fit_log =  np.polyval(sol1[0], np.log(xnew))
+    r2_log = [1-sol1[1]/((y - y.mean())**2).sum()][0][0]
 
-    sol = np.polyfit(x, y, 1, full=True)
-    fit_linear =  np.polyval(sol[0], xnew)
-    r2_linear = [1-sol[1]/((y - y.mean())**2).sum()][0][0]
+    sol2 = np.polyfit(x, y, 1, full=True)
+    fit_linear =  np.polyval(sol2[0], xnew)
+    r2_linear = [1-sol2[1]/((y - y.mean())**2).sum()][0][0]
     
+    print(aicc(6,2,sol2[1]))
+    print(aicc(6,2,sol1[1]))
+    print('next')
+    
+    RL = np.exp((aicc(6,2,sol2[1])-aicc(6,2,sol1[1]))/2)[0]
     if r2_log > r2_linear:
         ax.plot(xnew,fit_log, 'r', alpha = 0.75, label = 'log $R^2 =$ {r:.{d}f}'.format(r = r2_log, d =3))
         ax.plot(xnew,fit_linear, 'k', alpha = 0.25, label = 'linear $R^2 =$ {r:.{d}f}'.format(r = r2_linear,d = 3))
@@ -161,6 +167,8 @@ def plot_fits(ax, x, y, yerr, xlabel, ylabel, title = None, xerr = None, x_ticks
         ax.plot(xnew,fit_log, 'k', alpha = 0.25, label = 'log $R^2 =$ {r:.{d}f}'.format(r=r2_log, d= 3))
         ax.plot(xnew,fit_linear, 'r', alpha = 0.75, label = 'linear $R^2 =$ {r:.{d}f}'.format(r=r2_linear,d=3))
         
+    ax.plot(xnew,fit_log, 'k', alpha = 0.5, label = '$RL =$ {r:.{d}f}'.format(r=RL, d= 3))
+    
     l = ax.legend(frameon = False, handlelength=0, loc='lower right', prop={'size': legend_size},borderaxespad=0)
     l._legend_box.align = "right"
     
@@ -173,8 +181,11 @@ def plot_fits(ax, x, y, yerr, xlabel, ylabel, title = None, xerr = None, x_ticks
 
     
     if title: ax.set_title(title)
-    return r2_log/r2_linear
+    return r2_log/r2_linear, np.exp((aicc(6,2,sol2[1])-aicc(6,2,sol1[1]))/2)
 
+def aicc(n,k,r):
+    return n*np.log(r/n)+2*k+(2*k*(k+1))/(n-k-1)
+    
 def add_comment(filename, sheet, cell, comment):
     wb2 = openpyxl.load_workbook(filename)
     wb2[sheet][cell] = comment
